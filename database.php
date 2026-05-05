@@ -1,8 +1,8 @@
 <?php
 // ตั้งค่าการเชื่อมต่อฐานข้อมูล
-$servername = "localhost"; // หรือ IP ของเซิร์ฟเวอร์ฐานข้อมูล
-$username = "root"; // เปลี่ยนเป็นชื่อผู้ใช้ฐานข้อมูลของคุณ
-$password = ""; // เปลี่ยนเป็นรหัสผ่านฐานข้อมูลของคุณ
+$servername = "db"; // Docker MySQL service name
+$username = "root";
+$password = "root";
 $dbname = "ip"; // เปลี่ยนเป็นชื่อฐานข้อมูลของคุณ
 
 // สร้างการเชื่อมต่อ
