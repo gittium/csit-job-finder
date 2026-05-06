@@ -261,11 +261,15 @@ Central authentication table. Every account has one row here.
 
 ## 5. Installation & Setup
 
-### Prerequisites
+> **Docker note:** The admin panel (`csit-job-finder-admin`) ships with a `Dockerfile` and `docker-compose.yml` and is fully containerised. The **main app** (`csit-job-finder-main`) is currently configured for XAMPP. If you want to run both under Docker, update `database.php` in the main app as described in the note at the end of Step 3 below.
 
-Download and install **XAMPP** (recommended): [https://www.apachefriends.org](https://www.apachefriends.org)
+---
 
-Start the **Apache** and **MySQL** modules from the XAMPP Control Panel before proceeding.
+### Prerequisites — XAMPP
+
+Download and install **XAMPP**: [https://www.apachefriends.org](https://www.apachefriends.org)
+
+Open the XAMPP Control Panel and start both **Apache** and **MySQL** before proceeding.
 
 ---
 
@@ -279,12 +283,14 @@ C:\xampp\htdocs\csit-job-finder-main\
 
 > On macOS the web root is `/Applications/XAMPP/htdocs/`. On Linux it is typically `/opt/lampp/htdocs/`.
 
-If you also use the admin panel, place it alongside:
+If you are also running the admin panel locally, place both side by side:
 ```
 C:\xampp\htdocs\
 ├── csit-job-finder-main\
 └── csit-job-finder-admin\
 ```
+
+If the admin panel is running under Docker (its default), place only the main app in htdocs — the two apps share the same MySQL database but can run on different servers.
 
 ---
 
@@ -298,6 +304,8 @@ C:\xampp\htdocs\
 
 All tables and sample data will be created automatically.
 
+> If the admin panel is running under Docker, its MySQL instance is **separate** from XAMPP's. You will need to import the database into both, or point both applications at the same MySQL server.
+
 ---
 
 ### Step 3 — Configure the database connection
@@ -305,15 +313,15 @@ All tables and sample data will be created automatically.
 Open `csit-job-finder-main/database.php` and verify the credentials:
 
 ```php
-$servername = "localhost";
-$username   = "root";    // default XAMPP username
-$password   = "";        // default XAMPP has no root password
+$servername = "localhost";  // XAMPP default
+$username   = "root";
+$password   = "";           // XAMPP default (no password)
 $dbname     = "ip";
 ```
 
 Update `$password` if you have set a MySQL root password.
 
-> The admin panel has its own `db_connect.php` — update that file separately if needed.
+> **Running the main app in Docker too?** Change `$servername` to `"db"` and `$password` to `"root"` to match the admin panel's Docker Compose credentials, then add a `web` service for this app in `csit-job-finder-admin/docker-compose.yml` (or create a new compose file) with the same volume mount pattern.
 
 ---
 
@@ -326,7 +334,7 @@ profile/      ← profile picture uploads
 resumes/      ← resume PDF/document uploads
 ```
 
-If they do not exist, create them. On Linux/macOS also set write permissions:
+Create them if missing. On Linux/macOS also set write permissions:
 ```bash
 chmod 755 profile/ resumes/
 ```
@@ -342,7 +350,7 @@ chmod 755 profile/ resumes/
 http://localhost/csit-job-finder-main/login.php
 ```
 
-You will see the login page. Use the sample credentials from [Section 11](#11-test-credentials) to log in.
+Use the sample credentials from [Section 11](#11-test-credentials) to log in.
 
 ---
 
@@ -729,20 +737,24 @@ All endpoints accept GET or POST as described and return JSON unless noted.
 
 ## 12. Common Issues & Troubleshooting
 
-### Blank page or "Connection failed" error
+### Blank page or "Connection failed" error (XAMPP)
 - Confirm Apache and MySQL are running in the XAMPP Control Panel.
-- Check `database.php`: the `$password` field must match your MySQL root password (empty string `""` by default on XAMPP).
+- Check `database.php`: `$servername` must be `"localhost"` and `$password` must be `""` (empty string) unless you changed the MySQL root password.
 - Verify the database name is `ip` and the schema was imported successfully.
+
+### "Connection failed" after trying to connect to the admin panel's Docker MySQL from the main app
+- The admin panel's Docker MySQL runs on its own isolated network. The main app (XAMPP) cannot reach it via `"db"` — that hostname only resolves inside Docker.
+- Either use XAMPP's MySQL for both apps (import the schema into XAMPP's MySQL too), or run both apps inside the same Docker Compose stack.
 
 ### Redirected to login immediately
 - PHP sessions require the `session.save_path` directory to be writable.
-- On XAMPP Windows this is `C:\xampp\tmp`. Confirm the folder exists.
+- On XAMPP Windows sessions are stored in `C:\xampp\tmp`. Confirm the folder exists.
 - Clear browser cookies and try again.
 
 ### Profile pictures or resumes not displaying / uploading
 - Confirm the `profile/` and `resumes/` directories exist inside `csit-job-finder-main/`.
 - On Linux/macOS, verify write permissions: `chmod 755 profile/ resumes/`.
-- Check `php.ini` `upload_max_filesize` and `post_max_size` — increase them if large files fail.
+- Check `php.ini` for `upload_max_filesize` and `post_max_size` — increase them if large files fail. In XAMPP these are in `C:\xampp\php\php.ini`.
 
 ### Subcategory dropdown not loading when selecting a job category
 - Open the browser developer console (F12) and check for a failed XHR request to `get_job_subcategories.php`.
