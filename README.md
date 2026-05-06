@@ -11,6 +11,8 @@ A comprehensive administration dashboard for managing users, roles, permissions,
 3. [Directory Structure](#3-directory-structure)
 4. [Database Schema Overview](#4-database-schema-overview)
 5. [Installation & Setup](#5-installation--setup)
+   - [Option A — Docker (recommended)](#option-a--docker-recommended)
+   - [Option B — XAMPP / local server](#option-b--xampp--local-server)
 6. [Accessing the Admin Panel](#6-accessing-the-admin-panel)
 7. [Feature Guide](#7-feature-guide)
    - [Dashboard](#71-dashboard--home_pagephp)
@@ -48,10 +50,11 @@ The admin panel is a **standalone PHP application** that connects to the same `i
 
 | Layer | Technology |
 |---|---|
-| Backend | PHP (procedural + MySQLi) |
-| Database | MySQL (database name: `ip`) |
+| Backend | PHP 8.2 (procedural + MySQLi) |
+| Database | MySQL 8.0 |
 | Frontend | HTML5, CSS3, Vanilla JavaScript |
-| Web Server | Apache (via XAMPP / WAMP / MAMP) |
+| Web Server | Apache (Docker container or XAMPP / WAMP / MAMP) |
+| Containerisation | Docker + Docker Compose |
 | Icons | Bootstrap Icons (CDN) |
 | Fonts | Google Fonts — Roboto, Montserrat |
 
@@ -62,7 +65,11 @@ The admin panel is a **standalone PHP application** that connects to the same `i
 ```
 csit-job-finder-admin/
 │
+├── Dockerfile                 # PHP 8.2-Apache image with MySQLi
+├── docker-compose.yml         # Three-service stack: web, db, phpmyadmin
+│
 ├── Home_page.php              # Dashboard home — metrics overview
+├── login.php                  # Admin login form and session creation
 ├── manage_users.php           # Activate / disable student & teacher accounts
 ├── Role_page.php              # Create & edit system roles (bilingual EN/TH)
 ├── Permission_page.php        # Manage skills, hobbies, and job categories
@@ -74,10 +81,11 @@ csit-job-finder-admin/
 ├── review.php                 # Review records
 ├── calculate_review.php       # Review score calculation helper
 │
-├── db_connect.php             # Database connection (used by Permission_page)
-├── database.php               # Database connection (used by manage_users, reports)
+├── db_connect.php             # DB connection — uses Docker service name "db"
+├── database.php               # DB connection — uses Docker service name "db"
 │
 ├── siderbar.php               # Sidebar navigation HTML component
+├── sidebar.html               # Sidebar HTML template
 ├── script_sidebar.js          # Sidebar toggle behaviour
 ├── script_home.js             # Dashboard JS
 ├── script_permission.js       # All permission CRUD modals and search
@@ -92,7 +100,11 @@ csit-job-finder-admin/
 │
 ├── css/                       # Additional per-page stylesheets
 │   ├── style_managruser.css
-│   └── style_reports.css
+│   ├── style_reports.css
+│   ├── joinus.css
+│   ├── reviewstyle.css
+│   ├── stupfstyle.css
+│   └── teacherprofilestyle.css
 │
 └── js/                        # Additional per-page scripts
     ├── script_manage_users.js
@@ -134,20 +146,104 @@ Key status values:
 
 ## 5. Installation & Setup
 
-### Prerequisites
+Two approaches are supported. **Docker** is recommended — it requires no local PHP or MySQL installation and works identically on any OS.
 
-- **XAMPP** (recommended) or any LAMP/WAMP/MAMP stack
+---
+
+### Option A — Docker (recommended)
+
+#### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
+
+#### Step 1 — Clone / place the project
+
+```bash
+# place the admin directory wherever you like, then cd into it
+cd csit-job-finder-admin
+```
+
+#### Step 2 — Start the stack
+
+```bash
+docker compose up -d --build
+```
+
+This builds and starts three containers:
+
+| Container | Port | Purpose |
+|---|---|---|
+| `csit-web` | [http://localhost:8080](http://localhost:8080) | PHP 8.2 + Apache serving the admin panel |
+| `csit-db` | `3306` | MySQL 8.0 — database `ip`, credentials `root` / `root` |
+| `csit-phpmyadmin` | [http://localhost:8081](http://localhost:8081) | phpMyAdmin GUI for the database |
+
+The web container waits for the database to pass its health check before starting.
+
+#### Step 3 — Import the database
+
+1. Open [http://localhost:8081](http://localhost:8081) (phpMyAdmin).
+2. Log in with **Username:** `root` **Password:** `root`.
+3. Select the `ip` database in the left panel (it is created automatically by the `MYSQL_DATABASE` env var).
+4. Click **Import**, choose the provided `.sql` dump file, and click **Go**.
+
+#### Step 4 — Open the admin panel
+
+Navigate to:
+
+```
+http://localhost:8080/login.php
+```
+
+#### Database connection (Docker)
+
+`db_connect.php` and `database.php` are already configured for Docker:
+
+```php
+$servername = "db";     // Docker Compose service name
+$username   = "root";
+$password   = "root";
+$dbname     = "ip";
+```
+
+Do **not** change `$servername` to `localhost` when running in Docker — containers communicate by service name, not by `localhost`.
+
+#### Useful Docker commands
+
+```bash
+# View running containers
+docker compose ps
+
+# View web container logs
+docker compose logs web
+
+# Stop all containers
+docker compose down
+
+# Stop and delete database volume (full reset)
+docker compose down -v
+
+# Rebuild after code changes
+docker compose up -d --build
+```
+
+---
+
+### Option B — XAMPP / local server
+
+#### Prerequisites
+
+- **XAMPP** (recommended): [https://www.apachefriends.org](https://www.apachefriends.org)
   - PHP 7.4 or higher
   - MySQL 5.7 or higher
   - Apache
 
-### Step 1 — Install XAMPP
+#### Step 1 — Install and start XAMPP
 
-Download and install XAMPP from [https://www.apachefriends.org](https://www.apachefriends.org). Start both the **Apache** and **MySQL** modules from the XAMPP Control Panel.
+Download and install XAMPP. Open the XAMPP Control Panel and start both **Apache** and **MySQL**.
 
-### Step 2 — Place the project files
+#### Step 2 — Place the project files
 
-Copy both project directories into your Apache web root:
+Copy both project directories into the Apache web root:
 
 ```
 C:\xampp\htdocs\
@@ -155,57 +251,58 @@ C:\xampp\htdocs\
 └── csit-job-finder-admin\
 ```
 
-> On macOS with XAMPP the web root is `/Applications/XAMPP/htdocs/`.
+> On macOS the web root is `/Applications/XAMPP/htdocs/`.
 
-### Step 3 — Create the database
+#### Step 3 — Create the database
 
-1. Open your browser and go to `http://localhost/phpmyadmin`.
-2. Click **New** in the left sidebar.
-3. Enter the database name `ip` and click **Create**.
-4. Select the `ip` database, click the **Import** tab.
-5. Click **Choose File**, select the provided `.sql` dump file, and click **Go**.
+1. Open `http://localhost/phpmyadmin`.
+2. Click **New**, enter `ip` as the database name, and click **Create**.
+3. Select `ip`, click the **Import** tab, choose the `.sql` dump file, and click **Go**.
 
-### Step 4 — Configure the database connection
+#### Step 4 — Update the database connection for XAMPP
 
-Open `csit-job-finder-admin/db_connect.php` (and `database.php` if it differs) and verify the credentials match your MySQL setup:
+Open `csit-job-finder-admin/db_connect.php` and `database.php` and change the credentials to match XAMPP defaults:
 
 ```php
-$servername = "localhost";
-$username   = "root";   // default XAMPP username
-$password   = "";       // default XAMPP has no password
+$servername = "localhost";  // not "db" — that is Docker-only
+$username   = "root";
+$password   = "";           // XAMPP default is no password
 $dbname     = "ip";
 ```
 
-If you have set a MySQL root password, update `$password` accordingly.
-
-### Step 5 — Verify the main app login path
-
-`Home_page.php`, `manage_users.php`, and `reports.php` redirect unauthenticated users to `../login.php`. Ensure the main app (`csit-job-finder-main`) is placed one level up from the admin panel in your web root, or update the redirect path in those files to match your folder structure.
-
-### Step 6 — Open in browser
-
-Navigate to:
+#### Step 5 — Open in browser
 
 ```
-http://localhost/csit-job-finder-admin/Home_page.php
+http://localhost/csit-job-finder-admin/login.php
 ```
-
-You will be redirected to the login page if no session is active.
 
 ---
 
 ## 6. Accessing the Admin Panel
 
-Log in through the main application's login page using admin credentials:
+The admin panel has its own login page (`login.php`) inside the `csit-job-finder-admin` directory.
+
+| Approach | Login URL |
+|---|---|
+| Docker | `http://localhost:8080/login.php` |
+| XAMPP | `http://localhost/csit-job-finder-admin/login.php` |
+
+**Default admin credentials:**
 
 | Field | Value |
 |---|---|
 | User ID | `admin0141` |
 | Password | `admin1234` |
 
-After login, a PHP session is created with `$_SESSION['user_id']`. All admin pages check for this session key and redirect to `../login.php` if it is missing.
+On successful login `login.php` creates a PHP session (`$_SESSION['user_id']`, `$_SESSION['user_role']`, `$_SESSION['name']`) and redirects to `Home_page.php`. Every other page checks for `$_SESSION['user_id']` and redirects back to `login.php` if it is missing.
 
-> **Security note:** The default credentials above are for development. Change them before deploying to any shared or public environment.
+**Login flow:**
+1. POST to `login.php` with `id` and `password`.
+2. Query: `SELECT * FROM user WHERE user_id = ? AND password = ?`
+3. If `role_status_id ≠ 1` → error "Your account is not active."
+4. On success → redirect to `Home_page.php` (admin, role_id 2).
+
+> **Security note:** Passwords are stored as plain text in the current version. Do not expose this application on a public network without adding hashing (`password_hash` / `password_verify`).
 
 ---
 
@@ -505,28 +602,47 @@ Supported `action` values:
 
 ## 9. Common Issues & Troubleshooting
 
-### Page shows blank or "Connection failed"
+### Docker — containers start but the page shows "Connection failed"
 
-- Confirm that Apache and MySQL are running in the XAMPP Control Panel.
-- Check that `db_connect.php` and `database.php` have the correct `$username` and `$password` values.
-- Ensure the database name is `ip` and the schema has been imported.
+- The web container connects to MySQL using the service name `db`, not `localhost`. Verify `db_connect.php` and `database.php` both have `$servername = "db"`.
+- Run `docker compose logs db` to check if MySQL finished initialising. The first startup can take 20–30 seconds.
+- If you previously ran with XAMPP and changed the credentials, run `docker compose down -v` to wipe the database volume and start fresh.
+
+### Docker — web container exits immediately after `docker compose up`
+
+- Run `docker compose logs web` to see the error.
+- Most likely cause: the `db` health check hasn't passed yet. The compose file sets `depends_on: condition: service_healthy`, so this should not happen. If it does, increase `retries` in the `healthcheck` block of `docker-compose.yml`.
+
+### Docker — changes to PHP files not reflected in browser
+
+- The current directory is bind-mounted into `/var/www/html` (`- .:/var/www/html`), so changes apply immediately — no rebuild needed.
+- Clear the browser cache (Ctrl + Shift + R) if the old version is still showing.
+
+### XAMPP — Page shows blank or "Connection failed"
+
+- Confirm Apache and MySQL are running in the XAMPP Control Panel.
+- When using XAMPP, `db_connect.php` must use `$servername = "localhost"` and `$password = ""` (empty string). The Docker defaults (`"db"` / `"root"`) will not work.
+- Ensure the database name is `ip` and the schema was imported.
 
 ### Redirected to login on every page load
 
-- The admin panel stores authentication state in a PHP session. Make sure `session.save_path` is writable on your server.
-- In XAMPP on Windows, sessions are stored in `C:\xampp\tmp`. Verify this folder exists and has write permissions.
+- The admin panel stores auth state in a PHP session. Make sure the `session.save_path` directory is writable.
+- On XAMPP Windows sessions are stored in `C:\xampp\tmp`. Confirm the folder exists.
+- On Docker, PHP sessions are stored inside the container (`/tmp`) — this works by default.
 
 ### Images not loading in report detail view (`joinustest.php`)
 
-- The file contains a hardcoded base URL: `$base_url = "http://localhost/P6/admin/"`. Update this to match your actual folder path, e.g. `"http://localhost/csit-job-finder-admin/"`.
+- The file contains a hardcoded base URL: `$base_url = "http://localhost/P6/admin/"`.
+- **Docker:** update to `"http://localhost:8080/"`.
+- **XAMPP:** update to `"http://localhost/csit-job-finder-admin/"`.
 
 ### Activate / Disable button not responding
 
 - Open the browser developer console (F12). An AJAX error will appear if `manage_users.php` returned an unexpected response.
-- Confirm that the `user` table has a `role_status_id` column.
+- Confirm the `user` table has a `role_status_id` column.
 
 ### Permission changes not saving
 
 - Check the browser console for the JSON response from `Permission_action.php`.
-- Confirm that `Permission_action.php` is in the same directory as `Permission_page.php`.
+- Confirm `Permission_action.php` is in the same directory as `Permission_page.php`.
 - Ensure the database user has `INSERT` and `UPDATE` privileges on the `ip` database.
